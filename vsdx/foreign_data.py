@@ -45,6 +45,4 @@ class Rel:
 
     @property
     def data(self) -> io.BytesIO:
-        with open(self.data_path, "rb") as fh:
-            buf = io.BytesIO(fh.read())
-        return buf
+        return self.parent.page.vis.zip_file_contents[self.data_path]
