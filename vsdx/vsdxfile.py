@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import zipfile
+from collections import UserDict
 import shutil
 import os
 import re
@@ -50,6 +51,25 @@ def xml_to_file(xml: ET.ElementTree, filename: str, zip_file_contents: dict = No
     xml.write(file, xml_declaration=True, method='xml', encoding='UTF-8')
     zip_file_contents[filename] = io.BytesIO(file.getvalue())
 
+class FileDict(UserDict):
+    def _normalize(self, path: os.PathLike) -> str:
+        return os.path.realpath(os.fspath(path))
+
+    def __setitem__(self, key: os.PathLike, value: io.BytesIO):
+        super().__setitem__(self._normalize(key), value)
+
+    def __getitem__(self, key: os.PathLike):
+        return super().__getitem__(self._normalize(key))
+
+    def __contains__(self, key: os.PathLike):
+        return super().__contains__(self._normalize(key))
+
+    def get(self, key: os.PathLike, default=None):
+        return super().get(self._normalize(key), default)
+
+    def pop(self, key: os.PathLike, *args):
+        return super().pop(self._normalize(key), *args)
+
 
 class VisioFileNotOpen(BaseException):
     """Error class to report when a VisioFile is attempted to be saved when no longer open"""
@@ -94,7 +114,7 @@ class VisioFile:
         self.master_index = {}  # dict of master page info by item name e.g. 'Dynamic Connector'
         self.master_pages = list()  # type: List[Page]  # list of Page objects, populated by open_vsdx_file()
         self.file_open = False
-        self.zip_file_contents = {}  # dict of file contents by file_path
+        self.zip_file_contents = FileDict()  # dict of file contents by file_path
         self.open_vsdx_file()
 
     def __enter__(self):
