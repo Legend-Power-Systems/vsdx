@@ -145,7 +145,7 @@ class VisioFile:
         """Save the zip_file_contents to disk"""
         with zipfile.ZipFile(save_filename, "w") as zipf:
             for file_path, file_content in self.zip_file_contents.items(): # type: tuple(str, io.BytesIO)
-                file_path_in_zip : str = file_path.replace(self.directory+'/', '')
+                file_path_in_zip : str = os.path.relpath(file_path, start=self.directory)
                 
                 if file_path_in_zip.endswith('.xml') or file_path_in_zip.endswith('.rels'):
                     zipf.writestr(file_path_in_zip, file_content.read().decode('utf-8'))
