@@ -3,6 +3,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element
 import re
+import html
 
 from typing import Dict
 from typing import List
@@ -666,7 +667,7 @@ class Shape:
         if isinstance(text_element, Element):
             return (
                 (text_element.text or "") +
-                "".join(ET.tostring(e, encoding="unicode") for e in text_element)
+                "".join(html.unescape(ET.tostring(e, encoding="unicode")) for e in text_element)
             )
         elif self.master_page_ID and self.master_shape and self.master_shape.text:
             return self.master_shape.text  # get text from master shape
