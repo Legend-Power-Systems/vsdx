@@ -27,12 +27,12 @@ def to_float(val: str):
     except ValueError:
         return 0.0
 
-master_re = re.compile(r"(<ns0:.p .+\/>)(.*)", re.DOTALL)
-
-def _strip_master_tag(s: str) -> str:
-    if (m := master_re.match(s)):
-        return m.group(2)
-    return s
+master_re = re.compile(
+    r"^(?P<prefix>(?:<ns0:[cp].+?\/>)*)"
+    r"(?P<content>.*?)"
+    r"(?P<suffix>(?:<ns0:[cp].+?\/>)*\n*)$",
+    re.DOTALL
+)
 
 class Cell:
     """Represents a Cell element in a vsdx xml file"""
@@ -674,19 +674,24 @@ class Shape:
         return ""
 
     @property
-    def _text_master_tag(self) -> str:
-        match = master_re.match(self.text_raw)
-        if match:
-            return match.group(1)
-        return ""
+    def _text_master_tag_groupdict(self):
+        return master_re.match(self.text_raw).groupdict()
+
+    @property
+    def _text_master_tag_pre(self) -> str:
+        return self._text_master_tag_groupdict["prefix"]
+
+    @property
+    def _text_master_tag_post(self) -> str:
+        return self._text_master_tag_groupdict["suffix"]
 
     @property
     def text(self):
-        return _strip_master_tag(self.text_raw)
+        return self._text_master_tag_groupdict["content"]
 
     @text.setter
     def text(self, value):
-        _value = self._text_master_tag + value
+        _value = self._text_master_tag_pre + value + self._text_master_tag_post
         text_element = self.xml.find(f"{namespace}Text")
         if isinstance(text_element, Element):  # if there is a Text element then clear out and set contents
             wrapper = ET.fromstring(f"<wrapper>{_value}</wrapper>")
