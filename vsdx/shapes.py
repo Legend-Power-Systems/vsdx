@@ -3,6 +3,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element
 import re
+import html
 
 from typing import Dict
 from typing import List
@@ -26,13 +27,12 @@ def to_float(val: str):
     except ValueError:
         return 0.0
 
-master_re = re.compile(r"(<ns0:cp .+\/>)(.*)", re.DOTALL)
-
-def _strip_master_tag(s: str) -> str:
-    if (m := master_re.match(s)):
-        return m.group(2)
-    return s
-
+master_re = re.compile(
+    r"^(?P<prefix>(?:<ns0:[cp].+?\/>)*)"
+    r"(?P<content>.*?)"
+    r"(?P<suffix>(?:<ns0:[cp].+?\/>)*\n*)$",
+    re.DOTALL
+)
 
 class Cell:
     """Represents a Cell element in a vsdx xml file"""
@@ -673,26 +673,31 @@ class Shape:
         if isinstance(text_element, Element):
             return (
                 (text_element.text or "") +
-                "".join(ET.tostring(e, encoding="unicode") for e in text_element)
+                "".join(html.unescape(ET.tostring(e, encoding="unicode")) for e in text_element)
             )
         elif self.master_page_ID and self.master_shape and self.master_shape.text:
             return self.master_shape.text  # get text from master shape
         return ""
 
     @property
-    def text(self):
-        return _strip_master_tag(self.text_raw)
+    def _text_master_tag_groupdict(self):
+        return master_re.match(self.text_raw).groupdict()
 
     @property
-    def _text_master_tag(self):
-        match = master_re.match(self.text_raw)
-        if match:
-            return match.group(1)
-        return ""
+    def _text_master_tag_pre(self) -> str:
+        return self._text_master_tag_groupdict["prefix"]
+
+    @property
+    def _text_master_tag_post(self) -> str:
+        return self._text_master_tag_groupdict["suffix"]
+
+    @property
+    def text(self):
+        return self._text_master_tag_groupdict["content"]
 
     @text.setter
     def text(self, value):
-        _value = self._text_master_tag + value
+        _value = self._text_master_tag_pre + value + self._text_master_tag_post
         tag = f"{namespace}Text"
         text_element = self.xml.find(tag)
         if isinstance(text_element, Element):  # if there is a Text element then clear out and set contents
