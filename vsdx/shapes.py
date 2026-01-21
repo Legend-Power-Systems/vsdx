@@ -26,6 +26,12 @@ def to_float(val: str):
     except ValueError:
         return 0.0
 
+master_re = re.compile(r"(<ns0:.p .+\/>)(.*)", re.DOTALL)
+
+def _strip_master_tag(s: str) -> str:
+    if (m := master_re.match(s)):
+        return m.group(2)
+    return s
 
 class Cell:
     """Represents a Cell element in a vsdx xml file"""
@@ -653,7 +659,7 @@ class Shape:
                         c.value = v
 
     @property
-    def text(self):
+    def text_raw(self):
         # return contents of Text element, or Master shape (if referenced), or empty string
         text_element = self.xml.find(f"{namespace}Text")
 
@@ -666,12 +672,23 @@ class Shape:
             return self.master_shape.text  # get text from master shape
         return ""
 
+    @property
+    def _text_master_tag(self) -> str:
+        match = master_re.match(self.text_raw)
+        if match:
+            return match.group(1)
+        return ""
+
+    @property
+    def text(self):
+        return _strip_master_tag(self.text_raw)
+
     @text.setter
     def text(self, value):
-
+        _value = self._text_master_tag + value
         text_element = self.xml.find(f"{namespace}Text")
         if isinstance(text_element, Element):  # if there is a Text element then clear out and set contents
-            wrapper = ET.fromstring(f"<wrapper>{value}</wrapper>")
+            wrapper = ET.fromstring(f"<wrapper>{_value}</wrapper>")
             text_element.clear()
             text_element.text = wrapper.text
             for child in wrapper:
