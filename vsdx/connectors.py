@@ -36,7 +36,7 @@ class Connect:
             media = vsdx.Media()
             connector_shape = media.straight_connector.copy(page)  # default to straight connector
             connector_shape.text = ''  # clear text used to find shape
-            if not os.path.exists(page.vis._masters_folder):
+            if not page.vis._masters_folder in page.vis.zip_file_contents:
                 # Add masters folder to directory if not already present
                 for file_name, file in media._media_vsdx.zip_file_contents.items():
                     if file_name.startswith(media._media_vsdx._masters_folder):

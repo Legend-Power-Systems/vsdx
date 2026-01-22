@@ -37,38 +37,41 @@ ET.register_namespace('', document_rels_namespace[1:-1])
 ET.register_namespace('', cont_types_namespace[1:-1])
 
 
-def file_to_xml(filename: str, zip_file_contents: dict = None) -> ET.ElementTree:
+def normalize_path(path: os.PathLike) -> str:
+    normalized = os.path.realpath(os.fspath(path))
+    if path.endswith(("/", "\\")):
+        normalized += os.path.sep
+    return normalized
+
+class FileDict(UserDict):
+    def __setitem__(self, key: os.PathLike, value: io.BytesIO):
+        super().__setitem__(normalize_path(key), value)
+
+    def __getitem__(self, key: os.PathLike):
+        return super().__getitem__(normalize_path(key))
+
+    def __contains__(self, key: os.PathLike):
+        return super().__contains__(normalize_path(key))
+
+    def get(self, key: os.PathLike, default=None):
+        return super().get(normalize_path(key), default)
+
+    def pop(self, key: os.PathLike, *args):
+        return super().pop(normalize_path(key), *args)
+
+def file_to_xml(filename: str, zip_file_contents: FileDict = None) -> ET.ElementTree:
     """Import a file as an ElementTree"""
     if filename in zip_file_contents:
         content : io.BytesIO = zip_file_contents[filename]
         tree = ET.parse(io.BytesIO(content.getvalue()))
         return tree
 
-
-def xml_to_file(xml: ET.ElementTree, filename: str, zip_file_contents: dict = None):
+def xml_to_file(xml: ET.ElementTree, filename: str, zip_file_contents: FileDict = None):
     """Save an ElementTree to zip_file_contents"""
     file : io.BytesIO = io.BytesIO()
     xml.write(file, xml_declaration=True, method='xml', encoding='UTF-8')
     zip_file_contents[filename] = io.BytesIO(file.getvalue())
 
-class FileDict(UserDict):
-    def _normalize(self, path: os.PathLike) -> str:
-        return os.path.realpath(os.fspath(path))
-
-    def __setitem__(self, key: os.PathLike, value: io.BytesIO):
-        super().__setitem__(self._normalize(key), value)
-
-    def __getitem__(self, key: os.PathLike):
-        return super().__getitem__(self._normalize(key))
-
-    def __contains__(self, key: os.PathLike):
-        return super().__contains__(self._normalize(key))
-
-    def get(self, key: os.PathLike, default=None):
-        return super().get(self._normalize(key), default)
-
-    def pop(self, key: os.PathLike, *args):
-        return super().pop(self._normalize(key), *args)
 
 
 class VisioFileNotOpen(BaseException):
@@ -161,13 +164,13 @@ class VisioFile:
         self.file_open = True
 
     def _pages_filename(self):
-        page_dir = f'{self.directory}/visio/pages/'
+        page_dir = normalize_path(f'{self.directory}/visio/pages/')
         pages_filename = page_dir + 'pages.xml'  # pages.xml contains Page name, width, height, mapped to Id
         return pages_filename
 
     @property
     def _masters_folder(self):
-        path = f"{self.directory}/visio/masters"
+        path = normalize_path(f"{self.directory}/visio/masters/")
         return path
 
     @property
@@ -176,8 +179,8 @@ class VisioFile:
         return path
 
     def load_pages(self):
-        rel_dir = f'{self.directory}/visio/pages/_rels/'
-        page_dir = f'{self.directory}/visio/pages/'
+        rel_dir = normalize_path(f'{self.directory}/visio/pages/_rels/')
+        page_dir = normalize_path(f'{self.directory}/visio/pages/')
 
         rel_filename = rel_dir + 'pages.xml.rels'
         rels = file_to_xml(rel_filename, self.zip_file_contents).getroot()  # rels contains page filenames
